@@ -69,12 +69,22 @@ export async function apiRequest<T = unknown>(
     payload = JSON.stringify(body);
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    credentials: "include",
-    headers,
-    body: payload,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      credentials: "include",
+      headers,
+      body: payload,
+    });
+  } catch {
+    // Network-level failure (server unreachable, DNS, CORS block, offline).
+    throw new ApiError(
+      0,
+      `Cannot reach the server at ${API_BASE}. Please check your connection or try again shortly.`,
+      "NETWORK_ERROR",
+    );
+  }
 
   if (res.status === 401 && !_retry && !path.startsWith("/auth/")) {
     const ok = await tryRefresh();
