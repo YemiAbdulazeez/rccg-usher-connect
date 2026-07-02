@@ -51,11 +51,11 @@ export function Navbar() {
         </nav>
 
         <div className="hidden lg:flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm">
+          <Button asChild variant="outline" size="sm">
             <Link to="/login">Login</Link>
           </Button>
           <Button asChild variant="brand" size="sm">
-            <Link to="/register">Join Ushering</Link>
+            <Link to="/register">Register now</Link>
           </Button>
         </div>
 
@@ -86,7 +86,7 @@ export function Navbar() {
                 <Link to="/login">Login</Link>
               </Button>
               <Button asChild variant="brand" size="sm" className="flex-1">
-                <Link to="/register">Join</Link>
+                <Link to="/register">Register now</Link>
               </Button>
             </div>
           </div>
