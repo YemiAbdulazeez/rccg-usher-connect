@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
-  BedDouble, Wallet, Bell, CheckCircle2, Clock, UserCog, ShieldCheck,
+  BedDouble, IdCard, Wallet, Bell, CheckCircle2, Clock, UserCog, ShieldCheck,
   ArrowUpRight, AlertTriangle, Sparkles, Users, Activity, MapPin,
 } from "lucide-react";
 import { AppHeader } from "@/components/app/AppHeader";
@@ -183,6 +183,8 @@ function Dashboard() {
             <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
               {[
                 { icon: BedDouble, label: "Book Hostel", to: "/app/hostel" as const },
+                { icon: IdCard, label: "ID Card", to: "/app/id-cards" as const },
+                { icon: Wallet, label: "Payments", to: "/app/payments" as const },
                 { icon: UserCog, label: "My Profile", to: "/app/profile" as const },
               ].map((q) => (
                 <Link key={q.label} to={q.to}>
@@ -201,13 +203,15 @@ function Dashboard() {
         {/* Locked notice for pending members */}
         {isMember && !isApproved && status !== "profile_incomplete" && status !== "rejected" && (
           <Card className="border-border/60 shadow-card-elegant">
-            <CardContent className="p-6 text-center space-y-2">
+            <CardContent className="p-6 text-center space-y-3">
               <Sparkles className="h-8 w-8 mx-auto text-gold" />
-              <p className="font-semibold">Member features unlock after approval</p>
+              <p className="font-semibold">Hostel booking is available now</p>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Only Hostel bookings, are available once your Regional Head Usher grants final approval.
-                We'll notify you the moment your status changes to have full access to other modules.
+                You can book and pay for a hostel while your application is under review. ID cards and
+                full access to other modules unlock once your Regional Head Usher grants final approval.
+                We'll notify you the moment your status changes.
               </p>
+              <Button asChild variant="brand" size="sm"><Link to="/app/hostel"><BedDouble className="h-4 w-4" /> Book Hostel</Link></Button>
             </CardContent>
           </Card>
         )}

@@ -34,10 +34,11 @@ export const Route = createFileRoute("/app/hostel")({
 function HostelPage() {
   const { user } = useAuth();
   const isAdmin = !!user && NATIONAL_ROLES.has(user.role);
-  const isApproved = user?.status === "approved";
   const eligible = !!user && canBookHostel(user);
 
-  const memberView = !isApproved ? <LockedNotice /> : eligible ? <UserBooking /> : <IneligibleNotice />;
+  // Hostel booking is open to approved and non-approved ushers alike; only the
+  // role gate (Zonal Head Usher and below) applies.
+  const memberView = eligible ? <UserBooking /> : <IneligibleNotice />;
 
   return (
     <div>
@@ -62,17 +63,6 @@ function HostelPage() {
         )}
       </div>
     </div>
-  );
-}
-
-function LockedNotice() {
-  return (
-    <Card className="border-border/60">
-      <CardContent className="p-10 text-center text-muted-foreground">
-        <Lock className="h-10 w-10 mx-auto mb-3 opacity-40" />
-        Hostel booking unlocks once your account is fully approved.
-      </CardContent>
-    </Card>
   );
 }
 
@@ -239,8 +229,9 @@ function UserBooking() {
                 {h.description && <p className="text-xs text-muted-foreground line-clamp-2">{h.description}</p>}
                 <div className="flex items-center justify-between text-sm pt-1">
                   <span className="font-bold text-primary">{naira(h.priceKobo)}</span>
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Users className="h-3 w-3" /> {h.available}/{h.capacity} left
+                  <span className={`text-xs flex items-center gap-1 ${h.available <= 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                    <Users className="h-3 w-3" />
+                    {h.available <= 0 ? "Fully booked" : `${h.available} of ${h.capacity} beds available`}
                   </span>
                 </div>
                 <Button

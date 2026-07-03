@@ -138,10 +138,11 @@ export const OFFICER_ROLE_OPTIONS: { slug: string; name: string; scope: "nationa
   { slug: "aphu", name: "Assistant Provincial Head Usher", scope: "province" },
 ];
 
-// Hostel booking is reserved for Zonal Head Ushers and below (rank >= 80).
+// Hostel booking is reserved for Zonal Head Ushers and below (rank >= 80),
+// and is open to both approved and non-approved ushers.
 export const HOSTEL_MIN_RANK = 80;
-export const canBookHostel = (u: Pick<AuthUser, "roleRank" | "status">) =>
-  u.status === "approved" && u.roleRank >= HOSTEL_MIN_RANK;
+export const canBookHostel = (u: Pick<AuthUser, "roleRank">) =>
+  u.roleRank >= HOSTEL_MIN_RANK;
 
 // ── Approvals ────────────────────────────────────────────────────────────────
 export type QueueItem = {
