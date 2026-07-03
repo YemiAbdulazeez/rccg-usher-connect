@@ -22,9 +22,9 @@ export const Route = createFileRoute("/onboarding")({
   component: OnboardingPage,
 });
 
+// Self-registration is limited to Zonal Head Usher and below. Regional/Provincial
+// head ushers (and above) are created by the Super Admin, so they are not offered here.
 const DESIGNATIONS = [
-  "Regional H/Usher", "Assist Regional H/Usher",
-  "Provincial H/Usher", "Assist Provincial H/Usher",
   "Zonal H/Usher", "Assist Zonal H/Usher",
   "Area H/Usher", "Assist Area H/Usher",
   "Parish H/Usher", "Assist Parish H/Usher", "Usher",
@@ -37,7 +37,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: CURRENT_YEAR - 1965 + 1 }, (_, i) => String(CURRENT_YEAR - i));
 
 type FormState = {
-  regionId?: number; provinceId?: number; zoneId?: number; areaId?: number; parishId?: number;
+  regionId?: number; provinceId?: number; zone?: string; area?: string; parish?: string;
   designation?: string; gender?: string; dob?: string; maritalStatus?: string;
   whatsapp?: string; homeAddress?: string; occupation?: string; employer?: string;
   officeAddress?: string; education?: string; placeOfWork?: string;
@@ -46,11 +46,21 @@ type FormState = {
 };
 
 const REQUIRED: (keyof FormState)[] = [
-  "regionId", "provinceId", "zoneId", "areaId", "parishId", "designation",
+  "regionId", "provinceId", "zone", "area", "parish", "designation",
   "gender", "dob", "maritalStatus", "whatsapp", "homeAddress", "occupation",
   "placeOfWork", "officeAddress", "education", "yearJoinedRccg", "yearJoinedUshers",
   "ordinationType", "ordinationYear", "pastorInCharge", "areaHqParish",
 ];
+
+const FIELD_LABELS: Partial<Record<keyof FormState, string>> = {
+  regionId: "Region", provinceId: "Province", zone: "Zone", area: "Area", parish: "Parish",
+  designation: "Designation", gender: "Gender", dob: "Date of Birth", maritalStatus: "Marital Status",
+  whatsapp: "WhatsApp Number", homeAddress: "Home Address", occupation: "Occupation",
+  placeOfWork: "Place of Work", officeAddress: "Office Address", education: "Highest Education",
+  yearJoinedRccg: "Year Joined RCCG", yearJoinedUshers: "Year Joined Ushering",
+  ordinationType: "Type of Ordination", ordinationYear: "Year of Current Ordination",
+  pastorInCharge: "Name of Pastor in Charge", areaHqParish: "Area HQ Parish",
+};
 
 function OnboardingPage() {
   const navigate = useNavigate();
@@ -59,9 +69,6 @@ function OnboardingPage() {
   const [f, setF] = useState<FormState>({});
   const [regions, setRegions] = useState<HierarchyNode[]>([]);
   const [provinces, setProvinces] = useState<HierarchyNode[]>([]);
-  const [zones, setZones] = useState<HierarchyNode[]>([]);
-  const [areas, setAreas] = useState<HierarchyNode[]>([]);
-  const [parishes, setParishes] = useState<HierarchyNode[]>([]);
   const [passportUrl, setPassportUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("profile_incomplete");
@@ -87,9 +94,9 @@ function OnboardingPage() {
         setF({
           regionId: fields.regionId ?? undefined,
           provinceId: fields.provinceId ?? undefined,
-          zoneId: fields.zoneId ?? undefined,
-          areaId: fields.areaId ?? undefined,
-          parishId: fields.parishId ?? undefined,
+          zone: fields.zone ?? undefined,
+          area: fields.area ?? undefined,
+          parish: fields.parish ?? undefined,
           designation: fields.designation ?? undefined,
           gender: fields.gender ?? undefined,
           dob: fields.dob ?? undefined,
@@ -108,11 +115,8 @@ function OnboardingPage() {
           pastorInCharge: fields.pastorInCharge ?? undefined,
           areaHqParish: fields.areaHqParish ?? undefined,
         });
-        // Hydrate dependent dropdowns for saved selections.
+        // Hydrate provinces for the saved region selection.
         if (fields.regionId) setProvinces((await hierarchyApi.provinces(fields.regionId)).provinces);
-        if (fields.provinceId) setZones((await hierarchyApi.zones(fields.provinceId)).zones);
-        if (fields.zoneId) setAreas((await hierarchyApi.areas(fields.zoneId)).areas);
-        if (fields.areaId) setParishes((await hierarchyApi.parishes(fields.areaId)).parishes);
       } catch (err) {
         if (err instanceof ApiError && err.code === "NO_TOKEN") navigate({ to: "/login" });
         else toast.error("Could not load your profile", { description: "Please refresh and try again." });
@@ -124,24 +128,9 @@ function OnboardingPage() {
   }, []);
 
   const onRegion = async (id: number) => {
-    set("regionId", id); set("provinceId", undefined); set("zoneId", undefined); set("areaId", undefined); set("parishId", undefined);
-    setProvinces([]); setZones([]); setAreas([]); setParishes([]);
+    set("regionId", id); set("provinceId", undefined);
+    setProvinces([]);
     setProvinces((await hierarchyApi.provinces(id)).provinces);
-  };
-  const onProvince = async (id: number) => {
-    set("provinceId", id); set("zoneId", undefined); set("areaId", undefined); set("parishId", undefined);
-    setZones([]); setAreas([]); setParishes([]);
-    setZones((await hierarchyApi.zones(id)).zones);
-  };
-  const onZone = async (id: number) => {
-    set("zoneId", id); set("areaId", undefined); set("parishId", undefined);
-    setAreas([]); setParishes([]);
-    setAreas((await hierarchyApi.areas(id)).areas);
-  };
-  const onArea = async (id: number) => {
-    set("areaId", id); set("parishId", undefined);
-    setParishes([]);
-    setParishes((await hierarchyApi.parishes(id)).parishes);
   };
 
   const payload = (): ProfileFieldsPayload => {
@@ -168,10 +157,15 @@ function OnboardingPage() {
   const missing = (k: keyof FormState) => showErrors && (f[k] === undefined || String(f[k]).trim() === "");
 
   const handleSubmit = async () => {
-    const incomplete = REQUIRED.some((k) => f[k] === undefined || String(f[k]).trim() === "");
-    if (incomplete) {
+    const missingKeys = REQUIRED.filter((k) => f[k] === undefined || String(f[k]).trim() === "");
+    if (missingKeys.length) {
       setShowErrors(true);
-      toast.error("Complete required fields", { description: "Passport and signature are optional and can be added later." });
+      const names = missingKeys.map((k) => FIELD_LABELS[k] ?? k);
+      const shown = names.slice(0, 4).join(", ");
+      const more = names.length > 4 ? ` and ${names.length - 4} more` : "";
+      toast.error(`Please complete: ${shown}${more}`, {
+        description: "Passport and signature are optional and can be added later.",
+      });
       return;
     }
     setSubmitting(true);
@@ -242,10 +236,10 @@ function OnboardingPage() {
           <CardContent className="p-6 md:p-8 space-y-8">
             <Section title="Church Information">
               <PickNode label="Region" value={f.regionId} options={regions} onChange={onRegion} err={missing("regionId")} />
-              <PickNode label="Province" value={f.provinceId} options={provinces} onChange={onProvince} err={missing("provinceId")} disabled={!f.regionId} />
-              <PickNode label="Zone" value={f.zoneId} options={zones} onChange={onZone} err={missing("zoneId")} disabled={!f.provinceId} />
-              <PickNode label="Area" value={f.areaId} options={areas} onChange={onArea} err={missing("areaId")} disabled={!f.zoneId} />
-              <PickNode label="Parish" value={f.parishId} options={parishes} onChange={(id) => set("parishId", id)} err={missing("parishId")} disabled={!f.areaId} />
+              <PickNode label="Province" value={f.provinceId} options={provinces} onChange={(id) => set("provinceId", id)} err={missing("provinceId")} disabled={!f.regionId} />
+              <Text label="Zone" value={f.zone} onChange={(v) => set("zone", v)} err={missing("zone")} placeholder="e.g. Zone 3" />
+              <Text label="Area" value={f.area} onChange={(v) => set("area", v)} err={missing("area")} placeholder="e.g. Area HQ" />
+              <Text label="Parish" value={f.parish} onChange={(v) => set("parish", v)} err={missing("parish")} placeholder="Your parish name" />
               <Pick label="Designation" value={f.designation} options={DESIGNATIONS} onChange={(v) => set("designation", v)} err={missing("designation")} />
             </Section>
 

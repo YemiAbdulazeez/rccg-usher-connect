@@ -4,9 +4,9 @@ import { api } from "./client";
 export type ProfileFieldsPayload = Partial<{
   regionId: number;
   provinceId: number;
-  zoneId: number;
-  areaId: number;
-  parishId: number;
+  zone: string;
+  area: string;
+  parish: string;
   designation: string;
   gender: string;
   dob: string;

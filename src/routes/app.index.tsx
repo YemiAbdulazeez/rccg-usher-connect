@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
-  BedDouble, IdCard, Wallet, Bell, CheckCircle2, Clock, UserCog, ShieldCheck,
+  BedDouble, Wallet, Bell, CheckCircle2, Clock, UserCog, ShieldCheck,
   ArrowUpRight, AlertTriangle, Sparkles, Users, Activity, MapPin,
 } from "lucide-react";
 import { AppHeader } from "@/components/app/AppHeader";
@@ -183,8 +183,6 @@ function Dashboard() {
             <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
               {[
                 { icon: BedDouble, label: "Book Hostel", to: "/app/hostel" as const },
-                { icon: IdCard, label: "ID Card", to: "/app/id-cards" as const },
-                { icon: Wallet, label: "Payments", to: "/app/payments" as const },
                 { icon: UserCog, label: "My Profile", to: "/app/profile" as const },
               ].map((q) => (
                 <Link key={q.label} to={q.to}>
@@ -207,8 +205,8 @@ function Dashboard() {
               <Sparkles className="h-8 w-8 mx-auto text-gold" />
               <p className="font-semibold">Member features unlock after approval</p>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Hostel booking, ID cards and payments become available once your Regional Head Usher grants final approval.
-                We'll notify you the moment your status changes.
+                Only Hostel bookings, are available once your Regional Head Usher grants final approval.
+                We'll notify you the moment your status changes to have full access to other modules.
               </p>
             </CardContent>
           </Card>

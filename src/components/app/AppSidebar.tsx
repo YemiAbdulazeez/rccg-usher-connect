@@ -13,12 +13,15 @@ import { Logo } from "@/components/site/Logo";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/AuthProvider";
-import { NATIONAL_ROLES, REVIEWER_ROLES, type AuthUser } from "@/lib/types";
+import { canBookHostel, NATIONAL_ROLES, REVIEWER_ROLES, type AuthUser } from "@/lib/types";
 
 type NavItem = { title: string; url: string; icon: LucideIcon; show: (u: AuthUser) => boolean };
 type NavGroup = { label: string; items: NavItem[] };
 
-const isApproved = (u: AuthUser) => u.status === "approved";
+// Hostel is available to approved Zonal-Head-Ushers-and-below (who can book) and to
+// national admins (who manage hostels). ID Card & Payments are "other modules" that
+// unlock with full access later.
+const canSeeHostel = (u: AuthUser) => canBookHostel(u) || NATIONAL_ROLES.has(u.role);
 
 const GROUPS: NavGroup[] = [
   {
@@ -32,9 +35,10 @@ const GROUPS: NavGroup[] = [
   {
     label: "Membership",
     items: [
-      { title: "Hostel Booking", url: "/app/hostel", icon: BedDouble, show: isApproved },
-      { title: "ID Card", url: "/app/id-cards", icon: IdCard, show: isApproved },
-      { title: "Payment History", url: "/app/payments", icon: Wallet, show: isApproved },
+      { title: "Hostel Booking", url: "/app/hostel", icon: BedDouble, show: canSeeHostel },
+      // ID Card & Payment History are gated until "full access" is granted.
+      { title: "ID Card", url: "/app/id-cards", icon: IdCard, show: () => false },
+      { title: "Payment History", url: "/app/payments", icon: Wallet, show: () => false },
     ],
   },
   {

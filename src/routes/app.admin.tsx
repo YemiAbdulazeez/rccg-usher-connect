@@ -19,7 +19,7 @@ import { adminApi } from "@/lib/api/admin.api";
 import { hierarchyApi } from "@/lib/api/hierarchy.api";
 import { ApiError } from "@/lib/api/client";
 import {
-  naira, NATIONAL_ROLES,
+  naira, NATIONAL_ROLES, OFFICER_ROLE_OPTIONS,
   type AdminStats, type AdminUser, type AuditLog, type HierarchyNode,
 } from "@/lib/types";
 
@@ -119,9 +119,6 @@ function Overview() {
           <CardContent className="space-y-1 text-sm">
             <Row k="Regions" v={stats.hierarchy.regions} />
             <Row k="Provinces" v={stats.hierarchy.provinces} />
-            <Row k="Zones" v={stats.hierarchy.zones} />
-            <Row k="Areas" v={stats.hierarchy.areas} />
-            <Row k="Parishes" v={stats.hierarchy.parishes} />
           </CardContent>
         </Card>
       </div>
@@ -168,14 +165,11 @@ function Reviewers({ canWrite }: { canWrite: boolean }) {
   return (
     <div className="space-y-6">
       {canWrite ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <CreatePhu onCreated={load} />
-          <CreateRhu onCreated={load} />
-        </div>
+        <CreateOfficer onCreated={load} />
       ) : (
         <Card className="border-gold/40 bg-gold/5">
           <CardContent className="p-4 text-sm text-muted-foreground flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4 text-gold-foreground" /> Only the Super Admin can create reviewer accounts.
+            <ShieldAlert className="h-4 w-4 text-gold-foreground" /> Only the Super Admin can create officer accounts.
           </CardContent>
         </Card>
       )}
@@ -189,8 +183,9 @@ function Reviewers({ canWrite }: { canWrite: boolean }) {
               <SelectContent>
                 <SelectItem value="all">All roles</SelectItem>
                 <SelectItem value="usher">Ushers</SelectItem>
-                <SelectItem value="phu">PHU</SelectItem>
-                <SelectItem value="rhu">RHU</SelectItem>
+                {OFFICER_ROLE_OPTIONS.map((r) => (
+                  <SelectItem key={r.slug} value={r.slug}>{r.name}</SelectItem>
+                ))}
                 <SelectItem value="super">Super Admin</SelectItem>
               </SelectContent>
             </Select>
@@ -222,25 +217,39 @@ function Reviewers({ canWrite }: { canWrite: boolean }) {
   );
 }
 
-function CreatePhu({ onCreated }: { onCreated: () => void }) {
+function CreateOfficer({ onCreated }: { onCreated: () => void }) {
   const [form, setForm] = useState(emptyReviewer);
+  const [role, setRole] = useState<string>("");
   const [regionId, setRegionId] = useState<number | null>(null);
   const [provinceId, setProvinceId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const scope = OFFICER_ROLE_OPTIONS.find((r) => r.slug === role)?.scope ?? null;
+
+  const reset = () => { setForm(emptyReviewer); setRole(""); setRegionId(null); setProvinceId(null); };
+
   const submit = async () => {
-    if (!provinceId) { toast.error("Select a province"); return; }
-    if (!form.firstName || !form.lastName || !form.email || form.password.length < 8) {
-      toast.error("Fill all fields (password min 8 chars)"); return;
-    }
+    if (!role) { toast.error("Select the role to create"); return; }
+    if (!form.firstName || !form.lastName || !form.email) { toast.error("First name, last name and email are required"); return; }
+    if (form.password.length < 8) { toast.error("Temporary password must be at least 8 characters"); return; }
+    if (scope === "province" && !provinceId) { toast.error("Select the province for this officer"); return; }
+    if (scope === "region" && !regionId) { toast.error("Select the region for this officer"); return; }
+
     setBusy(true);
     try {
-      await adminApi.createPhu({ ...form, phone: form.phone || undefined, provinceId });
-      toast.success("PHU created", { description: `${form.firstName} can now sign in.` });
-      setForm(emptyReviewer); setRegionId(null); setProvinceId(null);
+      await adminApi.createOfficer({
+        ...form,
+        phone: form.phone || undefined,
+        role,
+        regionId: scope === "region" ? regionId ?? undefined : undefined,
+        provinceId: scope === "province" ? provinceId ?? undefined : undefined,
+      });
+      const roleName = OFFICER_ROLE_OPTIONS.find((r) => r.slug === role)?.name ?? "Officer";
+      toast.success(`${roleName} created`, { description: `${form.firstName} can now sign in.` });
+      reset();
       onCreated();
     } catch (err) {
-      toast.error("Could not create PHU", { description: err instanceof ApiError ? err.message : undefined });
+      toast.error("Could not create officer", { description: err instanceof ApiError ? err.message : undefined });
     } finally {
       setBusy(false);
     }
@@ -248,60 +257,53 @@ function CreatePhu({ onCreated }: { onCreated: () => void }) {
 
   return (
     <Card className="border-border/60 shadow-card-elegant">
-      <CardHeader><CardTitle className="text-base flex items-center gap-2"><UserPlus className="h-4 w-4 text-primary" /> Create Provincial Head Usher</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <UserPlus className="h-4 w-4 text-primary" /> Create officer account
+        </CardTitle>
+      </CardHeader>
       <CardContent className="space-y-3">
+        <div className="space-y-1">
+          <Label>Role</Label>
+          <Select value={role || undefined} onValueChange={(v) => { setRole(v); setRegionId(null); setProvinceId(null); }}>
+            <SelectTrigger><SelectValue placeholder="Select a senior role…" /></SelectTrigger>
+            <SelectContent className="max-h-72">
+              {OFFICER_ROLE_OPTIONS.map((r) => <SelectItem key={r.slug} value={r.slug}>{r.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
         <ReviewerFields form={form} setForm={setForm} />
-        <RegionProvincePicker regionId={regionId} provinceId={provinceId} onRegion={setRegionId} onProvince={setProvinceId} />
-        <Button variant="brand" className="w-full" onClick={submit} disabled={busy}>{busy ? "Creating…" : "Create PHU"}</Button>
-        <p className="text-xs text-muted-foreground">Region is auto-linked from the selected province.</p>
+        {scope === "province" && (
+          <>
+            <RegionProvincePicker regionId={regionId} provinceId={provinceId} onRegion={setRegionId} onProvince={setProvinceId} />
+            <p className="text-xs text-muted-foreground">Region is auto-linked from the selected province.</p>
+          </>
+        )}
+        {scope === "region" && (
+          <RegionPicker regionId={regionId} onRegion={setRegionId} />
+        )}
+        {scope === "national" && (
+          <p className="text-xs text-muted-foreground">National roles are not tied to a specific region or province.</p>
+        )}
+        <Button variant="brand" className="w-full" onClick={submit} disabled={busy}>{busy ? "Creating…" : "Create account"}</Button>
       </CardContent>
     </Card>
   );
 }
 
-function CreateRhu({ onCreated }: { onCreated: () => void }) {
-  const [form, setForm] = useState(emptyReviewer);
+function RegionPicker({ regionId, onRegion }: { regionId: number | null; onRegion: (id: number) => void }) {
   const [regions, setRegions] = useState<HierarchyNode[]>([]);
-  const [regionId, setRegionId] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
-
   useEffect(() => { hierarchyApi.regions().then((r) => setRegions(r.regions)).catch(() => {}); }, []);
-
-  const submit = async () => {
-    if (!regionId) { toast.error("Select a region"); return; }
-    if (!form.firstName || !form.lastName || !form.email || form.password.length < 8) {
-      toast.error("Fill all fields (password min 8 chars)"); return;
-    }
-    setBusy(true);
-    try {
-      await adminApi.createRhu({ ...form, phone: form.phone || undefined, regionId });
-      toast.success("RHU created", { description: `${form.firstName} can now sign in.` });
-      setForm(emptyReviewer); setRegionId(null);
-      onCreated();
-    } catch (err) {
-      toast.error("Could not create RHU", { description: err instanceof ApiError ? err.message : undefined });
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
-    <Card className="border-border/60 shadow-card-elegant">
-      <CardHeader><CardTitle className="text-base flex items-center gap-2"><UserPlus className="h-4 w-4 text-primary" /> Create Regional Head Usher</CardTitle></CardHeader>
-      <CardContent className="space-y-3">
-        <ReviewerFields form={form} setForm={setForm} />
-        <div className="space-y-1">
-          <Label>Region</Label>
-          <Select value={regionId ? String(regionId) : undefined} onValueChange={(v) => setRegionId(Number(v))}>
-            <SelectTrigger><SelectValue placeholder="Select region…" /></SelectTrigger>
-            <SelectContent className="max-h-72">
-              {regions.map((r) => <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button variant="brand" className="w-full" onClick={submit} disabled={busy}>{busy ? "Creating…" : "Create RHU"}</Button>
-      </CardContent>
-    </Card>
+    <div className="space-y-1">
+      <Label>Region</Label>
+      <Select value={regionId ? String(regionId) : undefined} onValueChange={(v) => onRegion(Number(v))}>
+        <SelectTrigger><SelectValue placeholder="Select region…" /></SelectTrigger>
+        <SelectContent className="max-h-72">
+          {regions.map((r) => <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
 
@@ -359,54 +361,35 @@ function RegionProvincePicker({ regionId, provinceId, onRegion, onProvince }: {
 function HierarchyManager({ canWrite }: { canWrite: boolean }) {
   const [regions, setRegions] = useState<HierarchyNode[]>([]);
   const [provinces, setProvinces] = useState<HierarchyNode[]>([]);
-  const [zones, setZones] = useState<HierarchyNode[]>([]);
-  const [areas, setAreas] = useState<HierarchyNode[]>([]);
-  const [parishes, setParishes] = useState<HierarchyNode[]>([]);
   const [regionId, setRegionId] = useState<number | null>(null);
-  const [provinceId, setProvinceId] = useState<number | null>(null);
-  const [zoneId, setZoneId] = useState<number | null>(null);
-  const [areaId, setAreaId] = useState<number | null>(null);
 
   const loadRegions = useCallback(() => hierarchyApi.regions().then((r) => setRegions(r.regions)), []);
   useEffect(() => { void loadRegions(); }, [loadRegions]);
 
   const reloadProvinces = useCallback(() => { if (regionId) hierarchyApi.provinces(regionId).then((r) => setProvinces(r.provinces)); }, [regionId]);
-  const reloadZones = useCallback(() => { if (provinceId) hierarchyApi.zones(provinceId).then((r) => setZones(r.zones)); }, [provinceId]);
-  const reloadAreas = useCallback(() => { if (zoneId) hierarchyApi.areas(zoneId).then((r) => setAreas(r.areas)); }, [zoneId]);
-  const reloadParishes = useCallback(() => { if (areaId) hierarchyApi.parishes(areaId).then((r) => setParishes(r.parishes)); }, [areaId]);
-
-  useEffect(() => { setProvinces([]); setProvinceId(null); reloadProvinces(); }, [regionId, reloadProvinces]);
-  useEffect(() => { setZones([]); setZoneId(null); reloadZones(); }, [provinceId, reloadZones]);
-  useEffect(() => { setAreas([]); setAreaId(null); reloadAreas(); }, [zoneId, reloadAreas]);
-  useEffect(() => { setParishes([]); reloadParishes(); }, [areaId, reloadParishes]);
+  useEffect(() => { setProvinces([]); reloadProvinces(); }, [regionId, reloadProvinces]);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-5 md:grid-cols-2">
-      <Level
-        title="Regions" nodes={regions} selectedId={regionId} onSelect={setRegionId} canWrite={canWrite}
-        onAdd={async (name, code) => { await adminApi.createRegion({ name, code }); await loadRegions(); }}
-        onDelete={async (id) => { await adminApi.removeHierarchy("regions", id); await loadRegions(); if (regionId === id) setRegionId(null); }}
-      />
-      <Level
-        title="Provinces" nodes={provinces} selectedId={provinceId} onSelect={setProvinceId} canWrite={canWrite} disabled={!regionId}
-        onAdd={async (name, code) => { await adminApi.createProvince({ regionId: regionId!, name, code }); reloadProvinces(); }}
-        onDelete={async (id) => { await adminApi.removeHierarchy("provinces", id); reloadProvinces(); }}
-      />
-      <Level
-        title="Zones" nodes={zones} selectedId={zoneId} onSelect={setZoneId} canWrite={canWrite} disabled={!provinceId}
-        onAdd={async (name, code) => { await adminApi.createZone({ provinceId: provinceId!, name, code }); reloadZones(); }}
-        onDelete={async (id) => { await adminApi.removeHierarchy("zones", id); reloadZones(); }}
-      />
-      <Level
-        title="Areas" nodes={areas} selectedId={areaId} onSelect={setAreaId} canWrite={canWrite} disabled={!zoneId}
-        onAdd={async (name, code) => { await adminApi.createArea({ zoneId: zoneId!, name, code }); reloadAreas(); }}
-        onDelete={async (id) => { await adminApi.removeHierarchy("areas", id); reloadAreas(); }}
-      />
-      <Level
-        title="Parishes" nodes={parishes} selectedId={null} onSelect={() => {}} canWrite={canWrite} disabled={!areaId}
-        onAdd={async (name, code) => { await adminApi.createParish({ areaId: areaId!, name, code }); reloadParishes(); }}
-        onDelete={async (id) => { await adminApi.removeHierarchy("parishes", id); reloadParishes(); }}
-      />
+    <div className="space-y-4">
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="p-4 text-sm text-muted-foreground">
+          Configure <span className="font-medium text-foreground">Regions</span> and their{" "}
+          <span className="font-medium text-foreground">Provinces</span> here — these power the region/province
+          selects during onboarding. Zone, Area and Parish are entered as free text by each usher.
+        </CardContent>
+      </Card>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Level
+          title="Regions" nodes={regions} selectedId={regionId} onSelect={setRegionId} canWrite={canWrite}
+          onAdd={async (name, code) => { await adminApi.createRegion({ name, code }); await loadRegions(); }}
+          onDelete={async (id) => { await adminApi.removeHierarchy("regions", id); await loadRegions(); if (regionId === id) setRegionId(null); }}
+        />
+        <Level
+          title="Provinces" nodes={provinces} selectedId={null} onSelect={() => {}} canWrite={canWrite} disabled={!regionId}
+          onAdd={async (name, code) => { await adminApi.createProvince({ regionId: regionId!, name, code }); reloadProvinces(); }}
+          onDelete={async (id) => { await adminApi.removeHierarchy("provinces", id); reloadProvinces(); }}
+        />
+      </div>
     </div>
   );
 }

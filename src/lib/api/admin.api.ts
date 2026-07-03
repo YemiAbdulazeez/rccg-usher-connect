@@ -25,6 +25,9 @@ export const adminApi = {
     api.post<{ id: number }>("/admin/users/phu", input),
   createRhu: (input: ReviewerInput & { regionId: number }) =>
     api.post<{ id: number }>("/admin/users/rhu", input),
+  createOfficer: (
+    input: ReviewerInput & { role: string; regionId?: number; provinceId?: number },
+  ) => api.post<{ id: number }>("/admin/users/officer", input),
 
   createRegion: (input: { name: string; code: string }) =>
     api.post<{ id: number }>("/admin/hierarchy/regions", input),

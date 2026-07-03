@@ -22,7 +22,7 @@ import { hostelApi, type EventInput, type HostelInput } from "@/lib/api/hostel.a
 import { runPayment } from "@/lib/api/payments.api";
 import { ApiError } from "@/lib/api/client";
 import {
-  naira, NATIONAL_ROLES,
+  naira, NATIONAL_ROLES, canBookHostel,
   type AdminBooking, type Booking, type Hostel, type HostelEvent, type HostelListResponse,
 } from "@/lib/types";
 
@@ -35,6 +35,9 @@ function HostelPage() {
   const { user } = useAuth();
   const isAdmin = !!user && NATIONAL_ROLES.has(user.role);
   const isApproved = user?.status === "approved";
+  const eligible = !!user && canBookHostel(user);
+
+  const memberView = !isApproved ? <LockedNotice /> : eligible ? <UserBooking /> : <IneligibleNotice />;
 
   return (
     <div>
@@ -44,22 +47,18 @@ function HostelPage() {
       />
       <div className="p-4 md:p-6 animate-fade-in">
         {isAdmin ? (
-          <Tabs defaultValue="book">
+          <Tabs defaultValue="admin">
             <TabsList>
               <TabsTrigger value="book">My Booking</TabsTrigger>
               <TabsTrigger value="admin">Manage</TabsTrigger>
             </TabsList>
-            <TabsContent value="book" className="mt-4">
-              {isApproved ? <UserBooking /> : <LockedNotice />}
-            </TabsContent>
+            <TabsContent value="book" className="mt-4">{memberView}</TabsContent>
             <TabsContent value="admin" className="mt-4">
               <AdminPanel />
             </TabsContent>
           </Tabs>
-        ) : isApproved ? (
-          <UserBooking />
         ) : (
-          <LockedNotice />
+          memberView
         )}
       </div>
     </div>
@@ -72,6 +71,17 @@ function LockedNotice() {
       <CardContent className="p-10 text-center text-muted-foreground">
         <Lock className="h-10 w-10 mx-auto mb-3 opacity-40" />
         Hostel booking unlocks once your account is fully approved.
+      </CardContent>
+    </Card>
+  );
+}
+
+function IneligibleNotice() {
+  return (
+    <Card className="border-border/60">
+      <CardContent className="p-10 text-center text-muted-foreground">
+        <Lock className="h-10 w-10 mx-auto mb-3 opacity-40" />
+        Hostel booking is available to Zonal Head Ushers and below. Senior officers oversee bookings rather than reserving a bed.
       </CardContent>
     </Card>
   );

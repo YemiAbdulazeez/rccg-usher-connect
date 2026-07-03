@@ -29,9 +29,9 @@ export type HierarchyNode = { id: number; name: string; code: string };
 export type ProfileFields = {
   regionId: number | null;
   provinceId: number | null;
-  zoneId: number | null;
-  areaId: number | null;
-  parishId: number | null;
+  zone: string | null;
+  area: string | null;
+  parish: string | null;
   designation: string | null;
   gender: string | null;
   dob: string | null;
@@ -126,6 +126,22 @@ export const ADMIN_ROLES = new Set([
 export const REVIEWER_ROLES = new Set(["phu", "aphu", "rhu", "arhu", "super", "nhu", "anhu", "national_exec"]);
 // National-tier roles that can access the Super Admin console.
 export const NATIONAL_ROLES = new Set(["super", "nhu", "anhu", "national_exec"]);
+
+// Senior roles a Super Admin can create accounts for (never self-registerable).
+export const OFFICER_ROLE_OPTIONS: { slug: string; name: string; scope: "national" | "region" | "province" }[] = [
+  { slug: "nhu", name: "National Head Usher", scope: "national" },
+  { slug: "anhu", name: "Assistant National Head Usher", scope: "national" },
+  { slug: "national_exec", name: "National Executive", scope: "national" },
+  { slug: "rhu", name: "Regional Head Usher", scope: "region" },
+  { slug: "arhu", name: "Assistant Regional Head Usher", scope: "region" },
+  { slug: "phu", name: "Provincial Head Usher", scope: "province" },
+  { slug: "aphu", name: "Assistant Provincial Head Usher", scope: "province" },
+];
+
+// Hostel booking is reserved for Zonal Head Ushers and below (rank >= 80).
+export const HOSTEL_MIN_RANK = 80;
+export const canBookHostel = (u: Pick<AuthUser, "roleRank" | "status">) =>
+  u.status === "approved" && u.roleRank >= HOSTEL_MIN_RANK;
 
 // ── Approvals ────────────────────────────────────────────────────────────────
 export type QueueItem = {
